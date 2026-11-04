@@ -1,9 +1,36 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
   <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BAS Payment Report</title>
+    <!-- Zoho Creator widget SDK -->
+    <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+    <!-- PDF export (replaces the npm packages jspdf + jspdf-autotable) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <h2>This is a sample Widget built using Zoho Extension toolkit.</h2>
+    <!-- The whole report is drawn into #root by script.js (same as the React version) -->
+    <div id="root"></div>
+    <script src="./script.js"></script>
+    <script>
+      /* ===================================================
+         BACK BUTTON → Home page (portal_home_page)
+         =================================================== */
+      function goBackHome() {
+        try {
+          ZOHO.CREATOR.UTIL.navigateParentURL({
+            action: "open",
+            url: "#Page:portal_home_page",
+            window: "same"
+          });
+        } catch (e) {
+          console.error("Back navigation failed:", e);
+          alert("Could not open the Home page: " + (e && e.message ? e.message : e));
+        }
+      }
+    </script>
   </body>
 </html>

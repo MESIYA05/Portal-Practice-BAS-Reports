@@ -1,0 +1,373 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+/* =====================================================================
+   BAS Payment Report — styles
+   (converted from the React app: index.css + GLOBAL_STYLES in App.jsx)
+   ===================================================================== */
+
+/* ---- base page styles (from index.css) ---- */
+:root{--text:#6b6375;--text-h:#08060d;--bg:#fff;--border:#e5e4e7;--code-bg:#f4f3ec;--accent:#aa3bff;--accent-bg:#aa3bff1a;--accent-border:#aa3bff80;--social-bg:#f4f3ec80;--shadow:#0000001a 0 10px 15px -3px, #0000000d 0 4px 6px -2px;--sans:system-ui, "Segoe UI", Roboto, sans-serif;--heading:system-ui, "Segoe UI", Roboto, sans-serif;--mono:ui-monospace, Consolas, monospace;font:18px/145% var(--sans);letter-spacing:.18px;color-scheme:light dark;color:var(--text);background:var(--bg);font-synthesis:none;text-rendering:optimizelegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+@media (max-width:1024px){:root{font-size:16px}}
+@media (prefers-color-scheme:dark){:root{--text:#9ca3af;--text-h:#f3f4f6;--bg:#16171d;--border:#2e303a;--code-bg:#1f2028;--accent:#c084fc;--accent-bg:#c084fc26;--accent-border:#c084fc80;--social-bg:#2f303a80;--shadow:#0006 0 10px 15px -3px, #00000040 0 4px 6px -2px}}
+body{margin:0}
+#root{text-align:center;box-sizing:border-box;flex-direction:column;max-width:100%;min-height:100svh;display:flex}
+h1,h2{font-family:var(--heading);color:var(--text-h);font-weight:500}
+h1{letter-spacing:-1.68px;margin:32px 0;font-size:56px}
+@media (max-width:1024px){h1{margin:20px 0;font-size:36px}}
+h2{letter-spacing:-.24px;margin:0 0 8px;font-size:24px;line-height:118%}
+@media (max-width:1024px){h2{font-size:20px}}
+p{margin:0}
+code{font-family:var(--mono);color:var(--text-h);border-radius:4px;display:inline-flex;background:var(--code-bg);padding:4px 8px;font-size:15px;line-height:135%}
+
+/* ---- report styles (from GLOBAL_STYLES in App.jsx) ---- */
+
+  *, *::before, *::after {
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    box-sizing: border-box;
+  }
+
+  /* ── Prevent page-level horizontal scroll ── */
+  html, body { overflow-x: hidden; }
+  .apr-page  { overflow-x: hidden; }
+
+  /* ── Page scrollbar ── */
+  html::-webkit-scrollbar { width: 8px; }
+  html::-webkit-scrollbar-track { background: #eef2fb; }
+  html::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg,#4f8ef7 0%,#1a5eb8 60%,#0f3d80 100%);
+    border-radius: 8px; border: 2px solid #eef2fb;
+  }
+  html::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#1a5eb8,#0f3d80); }
+  html { scrollbar-width: thin; scrollbar-color: #1a5eb8 #eef2fb; }
+
+  /* ── Table scrollbar ── */
+  .pmt-table-scroll::-webkit-scrollbar { height: 7px; width: 7px; }
+  .pmt-table-scroll::-webkit-scrollbar-track { background:#eef2fb; border-radius:10px; margin:0 6px; }
+  .pmt-table-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg,#4f8ef7,#1a5eb8);
+    border-radius: 10px; border: 1px solid #eef2fb;
+  }
+  .pmt-table-scroll::-webkit-scrollbar-thumb:hover { background: linear-gradient(90deg,#1a5eb8,#0f3d80); }
+  .pmt-table-scroll::-webkit-scrollbar-corner { background: #eef2fb; }
+  .pmt-table-scroll { scrollbar-width: thin; scrollbar-color: #1a5eb8 #eef2fb; }
+
+  /* ── Interactions ── */
+  .pmt-row:hover td  { background: #f0f5ff !important; }
+  .sort-th             { cursor: pointer; user-select: none; }
+  .sort-th:hover       { background: #e8eef8 !important; }
+  .q-chip              { cursor: pointer; transition: all 0.15s; }
+  .q-chip:hover        { opacity: 0.85; }
+
+  @keyframes spin    { to { transform: rotate(360deg); } }
+  @keyframes fadeIn  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .fade-in { animation: fadeIn 0.25s ease both; }
+
+  /* ── Responsive: page padding ── */
+  .apr-page { padding: 0 0 24px; }
+  @media (max-width: 768px) { .apr-page { padding: 0 0 20px; } }
+
+  /* ── Responsive: page header ── */
+  .apr-page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
+  @media (max-width: 600px) { .apr-page-header { flex-direction:column; gap:10px; } }
+
+  /* ── Responsive: export buttons ── */
+  .apr-export-row { display:flex; gap:10px; flex-shrink:0; align-items:center; flex-wrap:wrap; margin-left:20px; margin-right:20px; }
+  @media (max-width: 600px) {
+    .apr-page-header { padding: 0 20px; }
+    .apr-export-row { width:100%; flex-wrap: nowrap; margin-left:0; margin-right:0; }
+    .apr-export-row button { flex:1 1 0; font-size:12px; padding:8px 8px; text-align:center; justify-content:center; }
+  }
+
+  /* ── Responsive: quarter chips ── */
+  .apr-quarter-ref { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  @media (max-width: 480px) { .apr-quarter-ref { gap:6px; } }
+  .apr-q-chip { padding:6px 14px; border-radius:20px; font-size:12.5px; font-weight:500; border:1px solid; display:flex; align-items:center; gap:4px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  @media (max-width: 400px) { .apr-q-chip { padding:5px 10px; font-size:11.5px; } }
+  @media (max-width: 600px) { .apr-quarter-ref { margin-right: 12px !important; } }
+
+  /* ── Responsive: filter grid — 3 columns, like Billing Status Report ── */
+  .apr-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 20px;
+  }
+  @media (max-width: 700px) { .apr-filter-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .apr-filter-grid { grid-template-columns: 1fr; gap: 12px; } }
+
+  /* ── Mobile: prevent selects from overflowing and causing sideways scroll ── */
+  @media (max-width: 600px) {
+    .apr-filter-grid,
+    .apr-filter-grid > div { min-width: 0; }
+    .apr-filter-grid select { width: 100%; min-width: 0; }
+  }
+
+  /* ── Responsive: action button row (separate row below the grid) ── */
+  .apr-action-row { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  @media (max-width: 480px) { .apr-action-row button { flex:1; } }
+
+  /* ── Responsive: search row ── */
+  .apr-search-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .apr-search-wrap { position:relative; display:flex; align-items:center; width:100%; max-width:360px; }
+  @media (max-width: 500px) { .apr-search-wrap { max-width:100%; } }
+  @media (max-width: 480px) {
+    .apr-search-row { flex-wrap: nowrap; }
+    .apr-search-wrap { max-width: none; flex: 1 1 auto; }
+    .apr-search-row .recordCount, .apr-search-row span[style*="whiteSpace"] { flex-shrink: 0; }
+  }
+  /* tighten select/label sizing so columns don't feel cramped */
+  @media (max-width: 480px) {
+    .apr-filter-grid select { font-size: 12.5px; padding: 6px 8px; }
+    .apr-filter-grid label  { font-size: 9.5px; }
+  }
+
+  /* ── Responsive: page title ── */
+  @media (max-width: 480px) {
+    .apr-page-title    { font-size: 20px !important; }
+    .apr-page-subtitle { font-size: 12px !important; }
+  }
+
+  /* ── Doctor requirement hint ── */
+  .apr-required-mark { color:#dc2626; margin-left:2px; }
+
+  /* ── Responsive: grand summary ── */
+  .apr-summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px 28px;
+  }
+  .apr-summary-col {
+    flex: 1 1 110px;
+    min-width: 90px;
+  }
+  @media (max-width: 700px) {
+    .apr-summary-row { gap: 16px 24px; }
+  }
+  @media (max-width: 480px) {
+    .apr-summary-title { font-size: 11.5px !important; margin-bottom: 12px !important; }
+    .apr-summary-row { gap: 14px 20px; }
+    .apr-summary-col { flex: 1 1 42%; min-width: 0; }
+    .apr-summary-label { font-size: 10px !important; }
+    .apr-summary-value { font-size: 16px !important; }
+  }
+  @media (max-width: 360px) {
+    .apr-summary-col { flex: 1 1 100%; }
+  }
+
+  /* ── Mobile: tighter gutters on the 20px-margin containers ── */
+  @media (max-width: 600px) {
+    .apr-filter-bar-wrap,
+    .apr-content-wrap { margin-left: 12px !important; margin-right: 12px !important; }
+    .apr-quarter-ref  { margin-left: 12px !important; }
+  }
+
+  /* ── Mobile: sort control (table headers are hidden in card mode) ── */
+  .apr-mobile-sort { display: none; }
+  @media (max-width: 600px) {
+    .apr-mobile-sort {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid #eef0f5;
+    }
+    .apr-mobile-sort select {
+      flex: 1; border: 1px solid #d1d5db; border-radius: 6px;
+      padding: 6px 8px; font-size: 12.5px; background: #fff; font-family: inherit;
+    }
+    .apr-mobile-sort button {
+      border: 1px solid #c5d3ee; background: #fff; color: #1a5eb8;
+      border-radius: 6px; padding: 6px 11px; font-size: 13px; cursor: pointer;
+    }
+  }
+
+  /* ── Mobile: table becomes stacked cards ── */
+  @media (max-width: 600px) {
+    .pmt-table-scroll { max-height: none; overflow-x: visible; padding: 10px 12px; }
+    .pmt-table, .pmt-table tbody, .pmt-table tr, .pmt-table td { display: block; width: 100%; }
+    .pmt-table thead { display: none; }
+    .pmt-table tr {
+      background: #fff !important;
+      border: 1px solid #e5e7eb; border-radius: 10px;
+      margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+    .pmt-table td {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+      text-align: right !important; white-space: normal;
+      padding: 9px 14px; border-bottom: 1px solid #f3f4f6; font-size: 13px;
+    }
+    .pmt-table tr td:last-child { border-bottom: none; }
+    .pmt-table td::before {
+      content: attr(data-label);
+      flex: 0 0 auto; text-align: left;
+      font-size: 10.5px; font-weight: 600; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .pmt-row:hover td { background: transparent !important; }
+  }
+
+/* ---- header (from the inline <style> in App.jsx) ---- */
+@media (max-width: 480px) {
+  .header-logo  { height: 45px !important; }
+  .header-title { font-size: 11px !important; }
+}
+
+/* ===== FIX 1: no black area at the bottom (keep this block LAST) =====
+   In dark mode the base styles turned the page background near-black below the report.
+   The report is always light, so the whole page now uses the report's light background. */
+:root{color-scheme:light;background:#f4f6fb}
+@media (prefers-color-scheme:dark){
+  :root{--text:#6b6375;--text-h:#08060d;--bg:#f4f6fb;--border:#e5e4e7;--code-bg:#f4f3ec;background:#f4f6fb}
+}
+html,body,#root{background:#f4f6fb}
+
+/* ===== FIX 2: fixed header (keep this block LAST) =====
+   Zoho sizes the widget frame to its content, so the page itself never scrolls and a normal
+   sticky header has nothing to stick to. The page is now exactly one screen tall and
+   .apr-page is the scroll area, so the header (logo + "BAS Payment Report") never moves,
+   on mobile and on desktop. Only the content below it scrolls. */
+html,body{height:100%;overflow:hidden}
+#root{height:100vh;height:100dvh;min-height:0}
+.apr-page{
+  flex:1 1 auto;
+  min-height:0;
+  height:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+.apr-page > div:first-child{          /* the header bar */
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+
+/* ===== MOBILE: Payment Detail as a normal table, same as desktop (keep this block LAST) =====
+   On phones the rows used to turn into stacked cards. Now the table keeps its header row and
+   columns (Payment ID | Hospital | Amount | Payer Name | Payment Date | Payment Method) and
+   slides sideways inside the card. Tapping a column heading sorts it, like on desktop. */
+@media (max-width: 600px) {
+  .apr-mobile-sort { display: none !important; }                 /* headings sort instead */
+
+  .pmt-table-scroll { max-height: 660px; overflow-x: auto; overflow-y: auto; padding: 0; -webkit-overflow-scrolling: touch; }
+  .pmt-table        { display: table !important; width: 100%; min-width: 760px; border-collapse: collapse; }
+  .pmt-table thead  { display: table-header-group !important; }
+  .pmt-table tbody  { display: table-row-group !important; width: auto; }
+  .pmt-table tr {
+    display: table-row !important; width: auto;
+    border: 0; border-radius: 0; margin: 0; box-shadow: none; overflow: visible;
+  }
+  .pmt-table tr.pmt-row:nth-child(odd)  { background: #fff !important; }
+  .pmt-table tr.pmt-row:nth-child(even) { background: #f7f8fa !important; }
+  .pmt-table td {
+    display: table-cell !important; width: auto;
+    white-space: nowrap; padding: 10px 14px; font-size: 13px;
+    border-bottom: 1px solid #f0f1f5;
+  }
+  .pmt-table td::before { content: none !important; display: none !important; }
+  /* keep each column's own alignment (Amount right, the rest left) */
+  .pmt-table td:nth-child(3), .pmt-table th:nth-child(3) { text-align: right !important; }
+  .pmt-table td:not(:nth-child(3)) { text-align: left !important; }
+  .pmt-row:hover td { background: #f0f5ff !important; }
+}
+/* ===== BACK BUTTON (top-right, next to the title) ===== */
+/* Push the title to the right so it sits right beside the Back button
+   (only the left margin; the title's own inline styles stay as they are) */
+.header-title { margin-left: auto !important; }
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 5px 16px 5px 5px;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: Arial, sans-serif !important;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  transition: opacity .15s ease;
+}
+.back-btn *, .back-btn-text { font-family: Arial, sans-serif !important; }
+.back-btn:hover { opacity: 0.85; }
+.back-btn:focus-visible { outline: 2px solid #1a5eb8; outline-offset: 2px; }
+
+.back-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+.back-btn-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 480px) {
+  /* keep logo, title and Back button on one row on phones */
+  .apr-page > div:first-child { flex-wrap: nowrap !important; padding: 0 12px !important; gap: 8px !important; }
+  .header-logo { min-width: 0; flex-shrink: 1; max-width: 38%; }
+  .back-btn { font-size: 11px; padding: 3px 9px 3px 3px; gap: 5px; }
+  .back-btn-icon { width: 20px; height: 20px; }
+  .back-btn-icon svg { width: 12px; height: 12px; }
+}
+/* ===== HEADER: bigger logo + bigger title (same as Claims Status Report) =====
+   The header is drawn by script.js with inline styles, so these rules use !important. */
+.apr-page > div:first-child { padding: 6px 28px !important; }
+.header-logo {
+  height: 110px !important;
+  max-width: 300px;
+  width: auto;
+}
+.header-title {
+  font-size: 30px !important;
+  line-height: 1.15 !important;
+}
+
+/* Mobile: logo, title and Back button on one neat row, title centered */
+@media (max-width: 680px) {
+  .apr-page > div:first-child {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
+  }
+  .header-logo {
+    width: 104px !important;
+    height: auto !important;
+    max-width: none !important;
+    min-width: 0;
+    flex: 0 0 auto !important;
+  }
+  .header-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 0 !important;
+    text-align: center;
+    font-size: clamp(13px, 4vw, 20px) !important;
+    white-space: nowrap;
+    line-height: 1.2 !important;
+    letter-spacing: 0 !important;
+  }
+  .back-btn { font-size: 11px; padding: 3px 10px 3px 3px; gap: 5px; }
+  .back-btn-icon { width: 20px; height: 20px; border-width: 1.5px; }
+  .back-btn-icon svg { width: 12px; height: 12px; }
+}
+@media (max-width: 360px) {
+  .apr-page > div:first-child { gap: 6px !important; padding: 8px 10px !important; }
+  .header-logo { width: 86px !important; }
+  .back-btn { font-size: 10px; padding: 3px 8px 3px 3px; gap: 4px; }
+  .back-btn-icon { width: 18px; height: 18px; }
+  .back-btn-icon svg { width: 11px; height: 11px; }
+}
