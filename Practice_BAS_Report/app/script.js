@@ -1230,42 +1230,42 @@ function renderFilterBar() {
   return (
     '<div style="' + st(S.filterBar) + '">' +
       '<div class="apr-filter-grid">' +
-        // Doctor (mandatory)
+        // Row 1, Col 1: Practice (Login-based, disabled)
+        '<div style="' + st(S.filterGroup) + '">' +
+          '<label style="' + st(S.label) + '">Practice</label>' +
+          '<input type="text" data-act="practice" value="' + h(state.practiceName || (state.loadingData ? "Loading practice…" : "—")) + '" disabled style="' + st(S.select, { background: "#f3f6fb", color: "#374151", cursor: "not-allowed", fontWeight: 600, border: "1px solid #d1d5db" }) + '" title="' + h(state.practiceName || "") + '">' +
+        "</div>" +
+        // Row 1, Col 2: Doctor (mandatory)
         '<div style="' + st(S.filterGroup) + '">' +
           '<label style="' + st(S.label) + '">Doctor<span class="apr-required-mark">*</span></label>' + doctorCtl +
         "</div>" +
-        // BAS Quarter
-        '<div style="' + st(S.filterGroup) + '">' +
-          '<label style="' + st(S.label) + '">BAS Quarter</label>' +
-          '<select data-act="quarter" style="' + st(S.select) + '">' +
-            options([{ value: "", label: "Select quarter…" }].concat(BAS_QUARTERS.map(function (q) { return { value: q.id, label: q.label }; })), state.selQuarter) +
-          "</select>" +
-        "</div>" +
-        // Financial Year
-        '<div style="' + st(S.filterGroup) + '">' +
-          '<label style="' + st(S.label) + '">Financial Year</label>' +
-          '<select data-act="fy" style="' + st(S.select) + '">' +
-            options(FINANCIAL_YEARS.map(function (f) { return { value: f.id, label: f.label }; }), state.selFY) +
-          "</select>" +
-        "</div>" +
-        // Hospital — scoped to selected doctor
+        // Row 1, Col 3: Hospital — scoped to selected doctor
         '<div style="' + st(S.filterGroup) + '">' +
           '<label style="' + st(S.label) + '">Hospital</label>' +
           '<select data-act="hospital" style="' + st(S.select) + '"' + (state.selDoctor ? "" : " disabled") + ">" +
             options([{ value: "all", label: "All Hospitals" }].concat(getHospitals().map(function (x) { return { value: x, label: x }; })), state.selHospital) +
           "</select>" +
         "</div>" +
-        // Payment Method
+        // Row 2, Col 1: BAS Quarter
+        '<div style="' + st(S.filterGroup) + '">' +
+          '<label style="' + st(S.label) + '">BAS Quarter</label>' +
+          '<select data-act="quarter" style="' + st(S.select) + '">' +
+            options([{ value: "", label: "Select quarter…" }].concat(BAS_QUARTERS.map(function (q) { return { value: q.id, label: q.label }; })), state.selQuarter) +
+          "</select>" +
+        "</div>" +
+        // Row 2, Col 2: Financial Year
+        '<div style="' + st(S.filterGroup) + '">' +
+          '<label style="' + st(S.label) + '">Financial Year</label>' +
+          '<select data-act="fy" style="' + st(S.select) + '">' +
+            options(FINANCIAL_YEARS.map(function (f) { return { value: f.id, label: f.label }; }), state.selFY) +
+          "</select>" +
+        "</div>" +
+        // Row 2, Col 3: Payment Method
         '<div style="' + st(S.filterGroup) + '">' +
           '<label style="' + st(S.label) + '">Payment Method</label>' +
           '<select data-act="method" style="' + st(S.select) + '">' +
             options([{ value: "all", label: "All Methods" }].concat(getMethods().map(function (m) { return { value: m, label: m }; })), state.selMethod) +
           "</select>" +
-        "</div>" +
-        // Practice (Login-based, disabled)
-        '<div style="' + st(S.filterGroup) + '">' +
-          '<label style="' + st(S.label) + '">Practice</label>' +
-          '<input type="text" data-act="practice" value="' + h(state.practiceName || (state.loadingData ? "Loading practice…" : "—")) + '" disabled style="' + st(S.select, { background: "#f3f6fb", color: "#374151", cursor: "not-allowed", fontWeight: 600, border: "1px solid #d1d5db" }) + '" title="' + h(state.practiceName || "") + '">' +
         "</div>" +
       "</div>" +
 
