@@ -6,37 +6,30 @@
    ===================================================================== */
 
 /* =====================================================================
-   1) ZOHO API  (was zohoapi.jsx)
+   1) ZOHO API  (Practice Portal: My_Practice, Doctor_Hospital_Subform, Practice_Payments)
    ===================================================================== */
 
-// ── Config — update these values ─────────────────────────────────────────────
+// ── Config — update report names if required ─────────────────────────────────
 var ZOHO_CONFIG = {
-  APP_NAME: "claims-management",        // ← your Zoho Creator app link name
-  REPORT_NAME: "Claim_Payments_Portal", // ← your Zoho Creator report link name
-};
-
-var DOCTORS_CONFIG = {
-  appName: ZOHO_CONFIG.APP_NAME,
-  reportName: "Portal_Doctors1", // ← confirm this matches the report's link name
-  idField: "ID",
-  nameField: "Name",             // ← e.g. "Name" or "Doctor_Name" — check raw response if wrong
-  emailField: "Email",
-};
-
-/* ── USER-BASED FILTERING CONFIG ───────────────────────────────────────────────
-   When enabled, payment records (and the Doctor dropdown) are restricted to
-   the logged-in user's own Doctor record, matched via DOCTORS_CONFIG above.
-
-   - enabled: set false to disable restriction entirely (show everyone's data)
-   - adminEmails: these users bypass the restriction and see ALL records/doctors
------------------------------------------------------------------------------- */
-var USER_FILTER_CONFIG = {
-  enabled: true,
-  adminEmails: [], // e.g. ["admin@medielves.com.au"]
+  APP_NAME: "claims-management",
+  PRACTICE_REPORT: "My_Practice",                      // Logged-in practice report (Practice_Name)
+  MAPPING_REPORT: "Doctor_Hospital_Subform_Report",    // Subform report: Doctor, Hospital, Add_Practice
+  PAYMENTS_REPORT: "Practice_Payments",                // Practice payments report
 };
 
 function zohoReady() {
   return typeof ZOHO !== "undefined" && ZOHO && ZOHO.CREATOR;
+}
+
+function formatError(err) {
+  if (!err) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (err.message) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch (e) {
+    return String(err);
+  }
 }
 
 function initZoho() {
@@ -56,16 +49,12 @@ function initZoho() {
       })
       .catch(function (err) {
         console.error("[ZohoAPI] getInitParams failed:", err);
-        reject(new Error("Zoho init failed: " + ((err && err.message) || String(err))));
+        reject(new Error("Zoho init failed: " + formatError(err)));
       });
   });
 }
 
-/* ── initParams — cached so it only ever fires ONE real SDK call, even if ────
-   called from multiple places. Firing ZOHO.CREATOR.UTIL.getInitParams() twice
-   concurrently can corrupt the widget's postMessage correlation and cause a
-   subsequent getRecords() call to come back 403 Forbidden.
------------------------------------------------------------------------------- */
+/* ── initParams — cached so it only ever fires ONE real SDK call ──────────── */
 var _initParamsPromise = null;
 
 function getInitParams() {
@@ -87,7 +76,7 @@ function getLoggedInUserEmail() {
 
   _loggedInEmailPromise = (async function () {
     var params = await getInitParams();
-    console.info("[ZohoAPI] Raw init params (inspect this to confirm the email key):", params);
+    console.info("[ZohoAPI] Raw init params:", params);
 
     var p = params || {};
     var candidates = [
@@ -101,14 +90,7 @@ function getLoggedInUserEmail() {
 
     var email = String(candidates[0] || "").trim().toLowerCase();
 
-    if (!email) {
-      console.warn(
-        "[ZohoAPI] Could not auto-detect the logged-in user's email from " +
-        "getInitParams(). User-based filtering will fail open (show all " +
-        "records). Update getLoggedInUserEmail() in script.js once you've " +
-        "confirmed the correct key from the raw object logged above."
-      );
-    } else {
+    if (email) {
       console.info("[ZohoAPI] Logged-in user detected: " + email);
     }
 
@@ -119,188 +101,225 @@ function getLoggedInUserEmail() {
   return _loggedInEmailPromise;
 }
 
-/* ── Doctors report — fetch + cache + email lookup ──────────────────────────
-   Returns a normalised list: [{ id, name, email }, ...]
+/* ── 1) Practice details — fetched from #Report:My_Practice ─────────────────
+   The practice is login-based. In customer portals, My_Practice returns the
+   logged-in practice record. We read Practice_Name.
 ------------------------------------------------------------------------------ */
-var _doctorsPromise = null;
+async function getPracticeDetails() {
+  if (!zohoReady() || !ZOHO.CREATOR.DATA || !ZOHO.CREATOR.DATA.getRecords) {
+    console.warn("[ZohoAPI] Using mock practice (SDK unavailable).");
+    return getMockPractice();
+  }
 
-function getAllDoctors() {
-  if (_doctorsPromise) return _doctorsPromise;
+  var config = {
+    app_name: ZOHO_CONFIG.APP_NAME,
+    report_name: ZOHO_CONFIG.PRACTICE_REPORT,
+    page: 1,
+    pageSize: 10,
+    page_size: 10,
+  };
 
-  _doctorsPromise = (async function () {
-    if (!zohoReady() || !ZOHO.CREATOR.DATA || !ZOHO.CREATOR.DATA.getRecords) {
-      console.warn("[ZohoAPI] Using mock doctors (SDK unavailable).");
-      return getMockDoctors();
+  try {
+    var response = await ZOHO.CREATOR.DATA.getRecords(config);
+    console.log("[ZohoAPI] My_Practice response:", response);
+
+    if (response && (response.code === 3000 || response.code === "3000") && Array.isArray(response.data) && response.data.length > 0) {
+      var rows = response.data;
+      var loggedInEmail = await getLoggedInUserEmail();
+      var match = null;
+
+      if (loggedInEmail && rows.length > 1) {
+        match = rows.find(function (r) {
+          var em = String(r.Contact_Email || r["Contact_Email"] || "").trim().toLowerCase();
+          return em === loggedInEmail;
+        });
+      }
+
+      var row = match || rows[0];
+      var name = row.Practice_Name != null ? String(row.Practice_Name)
+               : row["Practice_Name"] != null ? String(row["Practice_Name"])
+               : resolveLookup(row["Practice"]) || "";
+      var id = row.ID != null ? String(row.ID) : "";
+
+      console.info("[ZohoAPI] Practice loaded: " + name + " (ID: " + id + ")");
+      return { id: id, name: name, raw: row };
     }
+  } catch (err) {
+    console.error("[ZohoAPI] getPracticeDetails failed:", err);
+  }
 
+  return { id: "", name: "" };
+}
+
+/* ── 2) Doctor & Hospital mappings — fetched from #Report:Doctor_Hospital_Subform_Report
+   Contains mapping rows with fields: Doctor, Hospital, Add_Practice
+------------------------------------------------------------------------------ */
+async function getDoctorHospitalMappings(practiceId, practiceName) {
+  if (!zohoReady() || !ZOHO.CREATOR.DATA || !ZOHO.CREATOR.DATA.getRecords) {
+    console.warn("[ZohoAPI] Using mock mappings (SDK unavailable).");
+    return getMockMappings();
+  }
+
+  var allMappings = [];
+  var page = 1;
+  var MAX_PAGES = 10;
+
+  while (page <= MAX_PAGES) {
     var config = {
-      app_name: DOCTORS_CONFIG.appName,
-      report_name: DOCTORS_CONFIG.reportName,
-      page: 1,
-      pageSize: 1000,
+      app_name: ZOHO_CONFIG.APP_NAME,
+      report_name: ZOHO_CONFIG.MAPPING_REPORT,
+      page: page,
+      pageSize: 200,
+      page_size: 200,
     };
 
     var response;
     try {
       response = await ZOHO.CREATOR.DATA.getRecords(config);
-      console.log("[ZohoAPI] Raw doctors response:", response);
+      console.log("[ZohoAPI] Doctor_Hospital_Subform_Report page " + page + " response:", response);
     } catch (err) {
-      console.error("[ZohoAPI] getRecords (Doctors) failed:", err);
-      throw new Error("Fetching Doctors report failed: " + ((err && err.message) || String(err)));
+      console.error("[ZohoAPI] getRecords (Doctor_Hospital_Subform_Report) failed:", err);
+      break;
     }
 
-    if (!response || response.code !== 3000) {
-      throw new Error(
-        "Zoho API error fetching Doctors (code " + ((response && response.code) != null ? response.code : "unknown") +
-        "): " + ((response && response.message) != null ? response.message : "No message")
-      );
-    }
+    if (response && (response.code === 3100 || response.code === "3100")) break;
+    if (!response || (response.code !== 3000 && response.code !== "3000")) break;
 
     var rows = Array.isArray(response.data) ? response.data : [];
-    var doctors = rows.map(function (d) {
-      return {
-        id: d[DOCTORS_CONFIG.idField] != null ? d[DOCTORS_CONFIG.idField] : "",
-        name: d[DOCTORS_CONFIG.nameField] != null ? d[DOCTORS_CONFIG.nameField] : "",
-        email: String(d[DOCTORS_CONFIG.emailField] || "").trim().toLowerCase(),
-      };
+    if (rows.length === 0) break;
+
+    rows.forEach(function (r) {
+      allMappings.push({
+        doctorId: resolveLookupId(r["Doctor"]),
+        doctorName: resolveLookup(r["Doctor"]),
+        hospitalId: resolveLookupId(r["Hospital"]),
+        hospitalName: resolveLookup(r["Hospital"]),
+        practiceId: resolveLookupId(r["Add_Practice"]),
+        practiceName: resolveLookup(r["Add_Practice"]),
+      });
     });
 
-    console.info("[ZohoAPI] Loaded " + doctors.length + " doctors.");
-    return doctors;
-  })();
-
-  return _doctorsPromise;
-}
-
-/** Find the Doctors-report record matching the logged-in user's email. */
-async function getDoctorForLoggedInUser() {
-  var email = await getLoggedInUserEmail();
-  if (!email) return null;
-
-  var doctors = await getAllDoctors();
-  var match = doctors.find(function (d) { return d.email === email; });
-
-  if (!match) {
-    console.warn(
-      '[ZohoAPI] No Doctor record found with Email = "' + email + '". ' +
-      "Check that the logged-in user's email matches a Doctors report row exactly, " +
-      "and that DOCTORS_CONFIG.emailField/reportName are correct."
-    );
-  }
-  return match || null;
-}
-
-/* ── User-filter status ─────────────────────────────────────────────────── */
-var _lastRestrictionStatus = { enabled: false, bypassed: false, email: "", matchedDoctor: "" };
-
-function getUserFilterStatus() {
-  return _lastRestrictionStatus;
-}
-
-// ── Fetch one page of records ─────────────────────────────────────────────────
-async function getPaymentRecords(opts) {
-  opts = opts || {};
-  var appName    = opts.appName    || ZOHO_CONFIG.APP_NAME;
-  var reportName = opts.reportName || ZOHO_CONFIG.REPORT_NAME;
-  var pageSize   = opts.pageSize   || 200;
-  var cursor     = opts.cursor     || null;
-  var criteria   = opts.criteria   || null;
-
-  if (!zohoReady() || !ZOHO.CREATOR.DATA || !ZOHO.CREATOR.DATA.getRecords) {
-    console.warn("[ZohoAPI] Using mock data (SDK unavailable).");
-    return { records: getMockRecords(), cursor: null };
+    if (rows.length < 200) break;
+    page++;
   }
 
-  var config = {
-    app_name:    appName,
-    report_name: reportName,
-    page_size:   pageSize,   // v2 SDK
-    pageSize:    pageSize,   // older builds — harmless if ignored
-  };
-  if (criteria) config.criteria = criteria;
-  if (cursor)   config.record_cursor = cursor;
-
-  var response;
-  try {
-    response = await ZOHO.CREATOR.DATA.getRecords(config);
-  } catch (err) {
-    throw new Error("getRecords call failed: " + ((err && err.message) || String(err)));
-  }
-
-  // 3100 = "no records found" for the given criteria — a valid empty result
-  if (response && response.code === 3100) return { records: [], cursor: null };
-
-  if (!response || response.code !== 3000) {
-    throw new Error(
-      "Zoho API error (code " + ((response && response.code) != null ? response.code : "unknown") + "): " +
-      ((response && response.message) != null ? response.message : "No message")
-    );
-  }
-
-  var rawRecords = Array.isArray(response.data) ? response.data : [];
-  return {
-    records: rawRecords.map(normaliseRecord),
-    cursor:  response.record_cursor || null,
-  };
-}
-
-// ── Fetch ALL pages, scoped to the logged-in doctor ──────────────────────────
-async function getAllPaymentRecords(options) {
-  options = options || {};
-  var pageSize  = options.pageSize != null ? options.pageSize : 200;
-  var MAX_PAGES = 100; // hard stop so a cursor bug can never loop forever
-
-  var mockMode = !zohoReady() || !ZOHO.CREATOR.DATA || !ZOHO.CREATOR.DATA.getRecords;
-
-  var loggedInEmail = "", bypass = false, doctorId = "", doctorName = "";
-
-  if (USER_FILTER_CONFIG.enabled && !mockMode) {
-    loggedInEmail = await getLoggedInUserEmail();
-    bypass = USER_FILTER_CONFIG.adminEmails
-      .map(function (e) { return e.toLowerCase(); })
-      .includes(loggedInEmail);
-
-    if (!bypass) {
-      var doctor = await getDoctorForLoggedInUser();
-      doctorId   = (doctor && doctor.id)   || "";
-      doctorName = (doctor && doctor.name) || "";
+  // Filter mappings for this practice if Add_Practice is provided on rows
+  var filtered = allMappings;
+  if (practiceId || practiceName) {
+    var matched = allMappings.filter(function (m) {
+      if (!m.practiceId && !m.practiceName) return true; // Report already scoped by portal
+      var idMatch = practiceId && m.practiceId && String(m.practiceId) === String(practiceId);
+      var nameMatch = practiceName && m.practiceName && m.practiceName.toLowerCase() === practiceName.toLowerCase();
+      return idMatch || nameMatch;
+    });
+    if (matched.length > 0) {
+      filtered = matched;
     }
   }
 
-  // Push the restriction into the query instead of downloading everything
-  var criteria = doctorId ? "Doctor == " + doctorId : null;
+  console.info("[ZohoAPI] Loaded " + filtered.length + " practice doctor/hospital mapping(s).");
+  return filtered;
+}
 
-  var all = [], cursor = null, pages = 0;
-
-  while (pages < MAX_PAGES) {
-    var res = await getPaymentRecords(Object.assign({}, options, { pageSize: pageSize, cursor: cursor, criteria: criteria }));
-    var records = res.records, next = res.cursor;
-    pages++;
-
-    // belt-and-braces: still filter locally in case criteria isn't honoured
-    all = all.concat(
-      doctorId
-        ? records.filter(function (r) { return String(r.doctorId) === String(doctorId); })
-        : records
-    );
-
-    if (!next || next === cursor || records.length === 0) break;
-    cursor = next;
+/* ── 3) Payments — fetched from #Report:Practice_Payments ────────────────────
+   Contains payment records: Payment_ID, payment_date, Payment_Method, Hospital,
+   Doctor, Amount, Payer_Name, etc.
+------------------------------------------------------------------------------ */
+async function getAllPaymentRecords() {
+  if (!zohoReady() || !ZOHO.CREATOR.DATA || !ZOHO.CREATOR.DATA.getRecords) {
+    console.warn("[ZohoAPI] Using mock payments (SDK unavailable).");
+    return getMockRecords();
   }
 
-  if (pages >= MAX_PAGES) {
-    console.warn("[ZohoAPI] Hit MAX_PAGES (" + MAX_PAGES + ") — results may be truncated.");
+  var all = [];
+  var page = 1;
+  var cursor = null;
+  var MAX_PAGES = 100;
+
+  while (page <= MAX_PAGES) {
+    var config = {
+      app_name: ZOHO_CONFIG.APP_NAME,
+      report_name: ZOHO_CONFIG.PAYMENTS_REPORT,
+      page: page,
+      pageSize: 200,
+      page_size: 200,
+    };
+    if (cursor) config.record_cursor = cursor;
+
+    var response;
+    try {
+      response = await ZOHO.CREATOR.DATA.getRecords(config);
+    } catch (err) {
+      throw new Error("getRecords call failed: " + formatError(err));
+    }
+
+    if (response && (response.code === 3100 || response.code === "3100")) {
+      break; // 3100 = No records found
+    }
+
+    if (!response || (response.code !== 3000 && response.code !== "3000")) {
+      var code = response ? response.code : "unknown";
+      var msg = response ? response.message : "No message";
+      throw new Error("Zoho API error (code " + code + "): " + msg);
+    }
+
+    var rawRecords = Array.isArray(response.data) ? response.data : [];
+    if (rawRecords.length === 0) break;
+
+    var norm = rawRecords.map(normaliseRecord);
+    all = all.concat(norm);
+
+    var nextCursor = response.record_cursor;
+    if (nextCursor && nextCursor !== cursor) {
+      cursor = nextCursor;
+    } else {
+      page++;
+    }
+
+    if (rawRecords.length < 200 && !nextCursor) break;
   }
 
-  _lastRestrictionStatus = {
-    enabled:  USER_FILTER_CONFIG.enabled,
-    bypassed: bypass,
-    email:    loggedInEmail,
-    matchedDoctor: doctorName,
-  };
-
-  console.info("[ZohoAPI] Total payment records: " + all.length + " (" + pages + " request(s))");
+  console.info("[ZohoAPI] Total practice payments: " + all.length);
   return all;
+}
+
+/* ── 4) Relational Matching ──────────────────────────────────────────────────
+   User rule:
+   if (#Report:Doctor_Hospital_Subform_Report doctor and hospital == #Report:Practice_Payments Doctor and Hospital) {
+     show doctor and hospital data related to practice
+   }
+   and payment method data comes from
+   if (#Report:Doctor_Hospital_Subform_Report doctor and hospital == #Report:Practice_Payments Doctor and Hospital) {
+     Payment method = #Report:Practice_Payments Payment Method
+   }
+------------------------------------------------------------------------------ */
+function filterPaymentsByPracticeMappings(payments, mappings) {
+  if (!mappings || mappings.length === 0) {
+    console.warn("[ZohoAPI] No practice mappings found — displaying all available payments.");
+    return payments;
+  }
+
+  return payments.filter(function (payment) {
+    return mappings.some(function (mapping) {
+      // Match Doctor: by ID if available, else by name
+      var docMatch = false;
+      if (mapping.doctorId && payment.doctorId) {
+        docMatch = String(mapping.doctorId) === String(payment.doctorId);
+      } else if (mapping.doctorName && payment.doctor) {
+        docMatch = mapping.doctorName.trim().toLowerCase() === payment.doctor.trim().toLowerCase();
+      }
+
+      // Match Hospital: by ID if available, else by name
+      var hospMatch = false;
+      if (mapping.hospitalId && payment.hospitalId) {
+        hospMatch = String(mapping.hospitalId) === String(payment.hospitalId);
+      } else if (mapping.hospitalName && payment.hospital) {
+        hospMatch = mapping.hospitalName.trim().toLowerCase() === payment.hospital.trim().toLowerCase();
+      }
+
+      return docMatch && hospMatch;
+    });
+  });
 }
 
 // ── Normaliser ────────────────────────────────────────────────────────────────
@@ -309,13 +328,11 @@ function normaliseRecord(raw) {
     paymentId: raw["Payment_ID"] != null ? raw["Payment_ID"] : "",
     paymentDate: parseZohoDate(raw["payment_date"]),
     paymentMethod: raw["Payment_Method"] != null ? raw["Payment_Method"] : "",
-    payer: resolveLookup(raw["Payer_Name"]),
+    payer: resolveLookup(raw["Payer_Name"]) || resolveLookup(raw["Payer"]) || "",
     hospital: resolveLookup(raw["Hospital"]),
+    hospitalId: resolveLookupId(raw["Hospital"]),
     doctor: resolveLookup(raw["Doctor"]),
-    doctorId:
-      raw["Doctor"] && typeof raw["Doctor"] === "object"
-        ? (raw["Doctor"]["ID"] != null ? raw["Doctor"]["ID"] : "")
-        : "",
+    doctorId: resolveLookupId(raw["Doctor"]),
     amount: parseCurrency(raw["Amount"]),
     _zohoId: raw["ID"] != null ? raw["ID"] : null,
   };
@@ -327,14 +344,25 @@ function normaliseRecord(raw) {
 function resolveLookup(val) {
   if (!val) return "";
   if (typeof val === "object") {
-    // Prefer display_value, fall back to any string property, last resort the ID
     var v = val.display_value != null ? val.display_value
           : val.zc_display_value != null ? val.zc_display_value
           : val.name != null ? val.name
+          : val.Doctor_Name != null ? val.Doctor_Name
+          : val.Hospital_Name != null ? val.Hospital_Name
+          : val.Practice_Name != null ? val.Practice_Name
           : val.ID != null ? val.ID : "";
-    return v;
+    return String(v);
   }
   return String(val);
+}
+
+/** Extract numeric/record ID from a Zoho lookup field or string */
+function resolveLookupId(val) {
+  if (!val) return "";
+  if (typeof val === "object") {
+    return val.ID != null ? String(val.ID) : (val.id != null ? String(val.id) : "");
+  }
+  return /^\d{15,20}$/.test(String(val).trim()) ? String(val).trim() : "";
 }
 
 /** Zoho dates arrive as "15-Jun-2025" or "2025-06-15" — convert to ISO YYYY-MM-DD */
@@ -370,38 +398,37 @@ function formatDisplayDate(iso) {
 }
 
 // ── Mock data (local dev only) ────────────────────────────────────────────────
-function getMockDoctors() {
+function getMockPractice() {
+  return { id: "31559000000010001", name: "Medi Elves Medical Practice" };
+}
+
+function getMockMappings() {
   return [
-    { id: "1", name: "Dr. Arun Prakash", email: "admin@medielves.com.au" },
-    { id: "2", name: "Dr. Meena Devi", email: "ak@agaramsoft.com" },
-    { id: "3", name: "Dr. Rajesh Kumar", email: "mohan@agaramsoft.com" },
-    { id: "4", name: "Dr. Steve Smith", email: "shejinshaji001@gmail.com" },
-    { id: "5", name: "Dr. Joseph Surya", email: "doss@agaramsoft.com" },
+    { doctorId: "1", doctorName: "Dr. Arun Prakash", hospitalId: "101", hospitalName: "Royal Melbourne Hospital" },
+    { doctorId: "1", doctorName: "Dr. Arun Prakash", hospitalId: "102", hospitalName: "St Vincent's Hospital Sydney" },
+    { doctorId: "2", doctorName: "Dr. Meena Devi",   hospitalId: "103", hospitalName: "Princess Alexandra Hospital" },
+    { doctorId: "3", doctorName: "Dr. Rajesh Kumar", hospitalId: "104", hospitalName: "Flinders Medical Centre" },
   ];
 }
 
 function getMockRecords() {
-  var hospitals = [
-    "Royal Melbourne Hospital",
-    "St Vincent's Hospital Sydney",
-    "Princess Alexandra Hospital",
-    "Flinders Medical Centre",
-    "Sir Charles Gairdner Hospital",
-  ];
-  var doctors = ["Dr. A. Sharma", "Dr. B. Nguyen", "Dr. C. Patel", "Dr. D. Wilson"];
+  var mappings = getMockMappings();
   var payers = ["Medibank", "Bupa", "HCF", "NIB", "Self-Funded"];
-  var methods = ["Bank Transfer", "Credit Card", "Cheque", "EFTPOS"];
+  var methods = ["Bank Transfer", "Credit Card", "EFTPOS", "Cheque"];
 
   var records = [];
-  for (var i = 1; i <= 18; i++) {
-    var amount = 800 + i * 430;
+  for (var i = 1; i <= 20; i++) {
+    var m = mappings[(i - 1) % mappings.length];
+    var amount = 750 + i * 320;
     records.push({
       paymentId: "PMT-" + (1000 + i),
-      paymentDate: "2025-0" + ((i % 9) + 1) + "-" + String((i % 28) + 1).padStart(2, "0"),
+      paymentDate: "2026-0" + ((i % 9) + 1) + "-" + String((i % 28) + 1).padStart(2, "0"),
       paymentMethod: methods[i % methods.length],
       payer: payers[i % payers.length],
-      hospital: hospitals[i % hospitals.length],
-      doctor: doctors[i % doctors.length],
+      hospital: m.hospitalName,
+      hospitalId: m.hospitalId,
+      doctor: m.doctorName,
+      doctorId: m.doctorId,
       amount: amount,
       _zohoId: "Z" + (1000 + i),
     });
@@ -528,7 +555,7 @@ function exportCSV(rows, meta, filename) {
 
   var html =
     '<table border="0" cellspacing="0" cellpadding="0">' +
-      "<tr>" + tdPlain('<b style="font-size:16pt">Payment Report</b>', "height:26pt") + "</tr>" +
+      "<tr>" + tdPlain('<b style="font-size:16pt">BAS Payment Report</b>' + (meta.practice ? ' <span style="font-size:12pt;color:#6b7280;margin-left:8px">(' + esc(meta.practice) + ')</span>' : ''), "height:26pt") + "</tr>" +
       "<tr><td></td></tr>" +
       "<tr>" +
         '<td style="font-weight:bold;font-family:Arial;padding:2px 6px" colspan="2">DOCTOR</td>' +
@@ -821,8 +848,14 @@ function drawPdfHeader(doc, meta, marginX, pageWidth, contentWidth) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor.apply(doc, NAVY);
-  var titleBaseline = y + logoH / 2 + 7;
+  var titleBaseline = y + logoH / 2 + (meta.practice ? 1 : 7);
   doc.text("BAS Payment Report", pageWidth - marginX, titleBaseline, { align: "right" });
+  if (meta.practice) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor.apply(doc, GRAY);
+    doc.text(meta.practice, pageWidth - marginX, titleBaseline + 14, { align: "right" });
+  }
 
   y += logoH + 8;
   doc.setDrawColor(225, 228, 233);
@@ -980,24 +1013,28 @@ var S = {
    6) PAGE STATE  (was the useState hooks in App())
    ===================================================================== */
 var state = {
-  allRecords:  [],
-  loadingData: true,
-  dataError:   null,
-  userFilter:  null,
+  practiceId:   "",
+  practiceName: "",
+  mappings:     [],
+  allPayments:  [],
+  allRecords:   [], // matched records satisfying mapping == payments
 
-  selDoctor:   "",
-  selQuarter:  "",
-  selFY:       FINANCIAL_YEARS[0].id,
-  selHospital: "all",
-  selMethod:   "all",
-  search:      "",
+  loadingData:  true,
+  dataError:    null,
 
-  applied: null,
-  running: false,
+  selDoctor:    "",
+  selQuarter:   "",
+  selFY:        FINANCIAL_YEARS[0].id,
+  selHospital:  "all",
+  selMethod:    "all",
+  search:       "",
+
+  applied:      null,
+  running:      false,
 
   // PaymentsTable sort (resets each time the results table is shown again)
-  sortCol: "paymentDate",
-  sortDir: "desc",
+  sortCol:      "paymentDate",
+  sortDir:      "desc",
 };
 
 /* ── derived values (were useMemo) ── */
@@ -1051,7 +1088,9 @@ function getAppliedInfo() {
   var applied = state.applied;
   var fyLabel = applied ? (FINANCIAL_YEARS.find(function (f) { return f.id === applied.fy; }) || {}).label || "" : "";
   var qLabel  = applied ? (BAS_QUARTERS.find(function (q) { return q.id === applied.quarter; }) || {}).label || "" : "";
+  var practice = state.practiceName || (applied ? applied.practice : "") || "";
   return {
+    practice: practice,
     fyLabel:  fyLabel,
     qLabel:   qLabel,
     period:   applied ? getPeriodLabel(applied.fy, applied.quarter) : "",
@@ -1059,7 +1098,8 @@ function getAppliedInfo() {
     hospital: applied && applied.hospital !== "all" ? applied.hospital : "All Hospitals",
     method:   applied && applied.method   !== "all" ? applied.method   : "All Methods",
     filename: applied
-      ? String(applied.doctor).replace(/\s+/g, "_") + "_" + applied.quarter + "_" + fyLabel.replace("/", "-")
+      ? (practice ? String(practice).replace(/\s+/g, "_") + "_" : "") +
+        String(applied.doctor).replace(/\s+/g, "_") + "_" + applied.quarter + "_" + fyLabel.replace("/", "-")
       : "Payment_Report",
   };
 }
@@ -1067,8 +1107,9 @@ function getAppliedInfo() {
 /* ── actions (were the handlers in App()) ── */
 function handleDoctorChange(value) {
   state.selDoctor = value;
-  // Reset hospital choice — the previous hospital may not belong to this doctor
+  // Reset hospital and payment method choices when doctor changes
   state.selHospital = "all";
+  state.selMethod = "all";
 }
 
 function syncDoctorLock() {
@@ -1083,7 +1124,7 @@ function handleRun() {
   render();
   setTimeout(function () {
     state.applied = {
-      doctor: state.selDoctor, quarter: state.selQuarter, fy: state.selFY,
+      practice: state.practiceName, doctor: state.selDoctor, quarter: state.selQuarter, fy: state.selFY,
       hospital: state.selHospital, method: state.selMethod,
     };
     state.search = "";
@@ -1221,6 +1262,11 @@ function renderFilterBar() {
             options([{ value: "all", label: "All Methods" }].concat(getMethods().map(function (m) { return { value: m, label: m }; })), state.selMethod) +
           "</select>" +
         "</div>" +
+        // Practice (Login-based, disabled)
+        '<div style="' + st(S.filterGroup) + '">' +
+          '<label style="' + st(S.label) + '">Practice</label>' +
+          '<input type="text" data-act="practice" value="' + h(state.practiceName || (state.loadingData ? "Loading practice…" : "—")) + '" disabled style="' + st(S.select, { background: "#f3f6fb", color: "#374151", cursor: "not-allowed", fontWeight: 600, border: "1px solid #d1d5db" }) + '" title="' + h(state.practiceName || "") + '">' +
+        "</div>" +
       "</div>" +
 
       // Action buttons — own row below the grid, left-aligned
@@ -1345,7 +1391,7 @@ function renderContent(filtered) {
       "<div>" +
         '<div style="font-weight:600;margin-bottom:4px">Failed to load records</div>' +
         '<div style="font-size:13px;color:#b91c1c">' + h(state.dataError) + "</div>" +
-        '<div style="font-size:12px;color:#9ca3af;margin-top:6px">Check <code>APP_NAME</code> and <code>REPORT_NAME</code> in <code>script.js</code>.</div>' +
+        '<div style="font-size:12px;color:#9ca3af;margin-top:6px">Check reports: <code>' + h(ZOHO_CONFIG.PRACTICE_REPORT) + '</code>, <code>' + h(ZOHO_CONFIG.MAPPING_REPORT) + '</code>, <code>' + h(ZOHO_CONFIG.PAYMENTS_REPORT) + '</code>.</div>' +
       "</div>" +
     "</div>";
   }
@@ -1436,12 +1482,13 @@ function onRootClick(e) {
     handleClear();
   } else if (act === "export-csv") {
     var a = getAppliedInfo();
-    exportCSV(getFiltered(), { doctor: a.doctor, hospital: a.hospital, quarter: a.qLabel, fy: a.fyLabel }, a.filename);
+    exportCSV(getFiltered(), { doctor: a.doctor, hospital: a.hospital, quarter: a.qLabel, fy: a.fyLabel, practice: a.practice }, a.filename);
   } else if (act === "export-pdf") {
     var b = getAppliedInfo();
     exportPDF(getFiltered(), {
       doctor: b.doctor, quarter: b.qLabel, period: b.period,
       fy: b.fyLabel, hospital: b.hospital, method: b.method,
+      practice: b.practice,
     }, b.filename);
   } else if (act === "sort") {
     var col = el.getAttribute("data-col");
@@ -1497,11 +1544,27 @@ function onRootInput(e) {
       await initZoho();
       await getInitParams();
 
-      var records = await getAllPaymentRecords();
-      state.allRecords = records;
-      state.userFilter = getUserFilterStatus();
+      // 1. Fetch practice details (from #Report:My_Practice)
+      var practice = await getPracticeDetails();
+      state.practiceId = practice.id || "";
+      state.practiceName = practice.name || "";
+
+      // 2. Fetch doctor-hospital mappings (from #Report:Doctor_Hospital_Subform_Report)
+      var mappings = await getDoctorHospitalMappings(state.practiceId, state.practiceName);
+      state.mappings = mappings;
+
+      // 3. Fetch practice payments (from #Report:Practice_Payments)
+      var payments = await getAllPaymentRecords();
+      state.allPayments = payments;
+
+      // 4. Relational matching:
+      // if (#Report:Doctor_Hospital_Subform_Report doctor and hospital == #Report:Practice_Payments Doctor and Hospital)
+      state.allRecords = filterPaymentsByPracticeMappings(payments, mappings);
+
+      syncDoctorLock();
     } catch (err) {
-      state.dataError = (err && err.message) || "Failed to load records.";
+      console.error("[start] Failed to load records:", err);
+      state.dataError = formatError(err);
     } finally {
       state.loadingData = false;
       render();
